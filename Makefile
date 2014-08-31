@@ -32,7 +32,7 @@ small: small.exe
 
 OBJS=window.obj
 
-window.c: qjulia.h
+window.cpp: qjulia.h
 
 qjulia.h: qjulia.c
 	gcc -E qjulia.c > qjulia.preprocessed.c
@@ -41,7 +41,7 @@ qjulia.h: qjulia.c
 	cat qjulia.h.tmp | sed 's/const\ char\ \*qjulia_tmp/static const char qjulia[]/g' > qjulia.h
 	rm qjulia.preprocessed.c qjulia.tmp qjulia.h.tmp
 
-%.obj: %.c
+%.obj: %.cpp
 	bash --init-file bash.rc -i -c "$(CC) $(FLAGS) $< /Fo:$@"
 
 intro.exe: $(OBJS)
@@ -51,5 +51,5 @@ small.exe: $(OBJS)
 	bash --init-file crinkler.rc -i -c "./bin/crinkler.exe /OUT:small.exe /HASHTRIES:500 /SUBSYSTEM:WINDOWS /COMPMODE:SLOW /ORDERTRIES:5000 /TRUNCATEFLOATS:16 /HASHSIZE:500 /PRINT:IMPORTS /ENTRY:winmain /PRINT:LABELS /REPORT:report.html /RANGE:d3d11.dll /RANGE:d3dcompiler_47.dll kernel32.lib d3dcompiler.lib user32.lib d3d11.lib $(OBJS)"
 
 clean:
-	rm -rf *html intro.exe small.exe *.pdb $(OBJS)
+	rm -rf *html intro.exe small.exe *manifest *.pdb $(OBJS)
 

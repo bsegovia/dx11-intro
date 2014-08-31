@@ -11,7 +11,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\window.c" />
+    <ClCompile Include="..\window.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{59E10D3C-095F-4EC4-B5AD-17BA37C9E165}</ProjectGuid>

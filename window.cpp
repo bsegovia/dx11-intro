@@ -13,10 +13,12 @@
 #include <Windows.h>
 #include <sal.h>
 #include <rpcsal.h>
-
+#define WELLBEHAVIOUR
+#if 0
 #define DEFINE_GUIDW(name, l, w1, w2, b1, b2, b3, b4, b5, b6, b7, b8)\
-  const GUID DECLSPEC_SELECTANY name = { l, w1, w2, { b1, b2,  b3,  b4,  b5,  b6,  b7,  b8 } }
+  const GUID DECLSPEC_SELECTANY name = { l, w2, w2, { b1, b2,  b3,  b4,  b5,  b6,  b7,  b8 } }
 DEFINE_GUIDW(IID_ID3D11Texture2D,0x6f15aaf2,0xd208,0x4e89,0x9a,0xb4,0x48,0x95,0x35,0xd3,0x4f,0x9c);
+#endif
 
 #include <d3d11.h>
 #include <d3dcompiler.h>
@@ -129,17 +131,29 @@ UpdateColor( float t[4], float a[4], float b[4] )
 }
 
 #define NAKED_ENTRY 1
+static __forceinline void GetDesktopResolution(int *horizontal, int *vertical)
+{
+	RECT desktop;
+	// Get a handle to the desktop window
+	const HWND hDesktop = GetDesktopWindow();
+	// Get the size of screen to the variable desktop
+	GetWindowRect(hDesktop, &desktop);
+	// The top left corner will have coordinates (0,0)
+	// and the bottom right corner will have coordinates
+	// (horizontal, vertical)
+	*horizontal = desktop.right;
+	*vertical = desktop.bottom;
+}
 
 #if !NAKED_ENTRY
 // this is a simplified entry point ...
-//void __stdcall WinMainCRTStartup()
-//{
- // ExitProcess(WinMain(GetModuleHandle(NULL), NULL, NULL, 0));
-//}
+void __stdcall WinMainCRTStartup()
+{
+  ExitProcess(WinMain(GetModuleHandle(NULL), NULL, NULL, 0));
+}
 
 // this is the main windows entry point ... 
-//int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
-void __cdecl winmain()
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
 #else
   // Take away prolog and epilog, then put a minial prolog back manually with
@@ -190,9 +204,12 @@ void __cdecl winmain()
 
       // keep track if the game loop is still running
       static BOOL BStartRunning;
+	  int w, h;
+
+	  GetDesktopResolution(&w, &h);
 
       // the most simple window
-      HWND hWnd = CreateWindow(L"edit", 0, WS_POPUP | WS_VISIBLE, WINPOSX, WINPOSY, WINWIDTH, WINHEIGHT, 0, 0, 0, 0);
+      HWND hWnd = CreateWindow(L"edit", 0, WS_POPUP | WS_VISIBLE | WS_MAXIMIZE, 0, 0, w, h, 0, 0, 0, 0);
 
       // don't show the cursor
       ShowCursor(FALSE);
@@ -221,12 +238,12 @@ void __cdecl winmain()
 
 
       DXGI_SWAP_CHAIN_DESC sdtemp;
-      pSwapChain->lpVtbl->GetDesc(pSwapChain, &sdtemp);
+      pSwapChain->GetDesc(&sdtemp);
 
       // get access to the back buffer via a texture
       ID3D11Texture2D* pTexture;
-      pSwapChain->lpVtbl->GetBuffer(pSwapChain, 0, (REFIID ) &IID_ID3D11Texture2D, ( LPVOID* )&pTexture );
-
+//      pSwapChain->GetBuffer(0, (REFIID) &IID_ID3D11Texture2D, ( LPVOID* )&pTexture );
+      pSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&pTexture);
       //
       // Create constant buffer
       //
@@ -246,10 +263,10 @@ void __cdecl winmain()
       Desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
       Desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
       Desc.ByteWidth = ((sizeof(MainConstantBuffer)+15) / 16) * 16; // must be multiple of 16 bytes
-      pd3dDevice->lpVtbl->CreateBuffer(pd3dDevice, &Desc, NULL, &pcbFractal);
+      pd3dDevice->CreateBuffer(&Desc, NULL, &pcbFractal);
 
       // create shader unordered access view on back buffer for compute shader to write into texture
-      pd3dDevice->lpVtbl->CreateUnorderedAccessView(pd3dDevice,(ID3D11Resource*)pTexture, NULL, &pComputeOutput );
+      pd3dDevice->CreateUnorderedAccessView((ID3D11Resource*)pTexture, NULL, &pComputeOutput );
 
       //
       // compile a compute shader
@@ -260,11 +277,11 @@ void __cdecl winmain()
 #if defined(_DEBUG)
       if (hr != S_OK)
       {
-        MessageBoxA(NULL, errmsg->lpVtbl->GetBufferPointer(errmsg), "Error", MB_OK | MB_ICONERROR);
+		  MessageBoxA(NULL, (LPCSTR) errmsg->GetBufferPointer(), "Error", MB_OK | MB_ICONERROR);
         MessageBoxA(NULL, "CreateComputerShader() failed", "Error", MB_OK | MB_ICONERROR);
       }
 #endif
-      pd3dDevice->lpVtbl->CreateComputeShader(pd3dDevice, blob->lpVtbl->GetBufferPointer(blob), blob->lpVtbl->GetBufferSize(blob), NULL, &pCompiledComputeShader);
+      pd3dDevice->CreateComputeShader(blob->GetBufferPointer(), blob->GetBufferSize(), NULL, &pCompiledComputeShader);
 #if defined(_DEBUG)
       if (hr != S_OK)
         MessageBoxA(NULL, "CreateComputerShader() failed", "Error", MB_OK | MB_ICONERROR);
@@ -302,10 +319,10 @@ void __cdecl winmain()
 
         // Fill constant buffer
         D3D11_MAPPED_SUBRESOURCE msr;
-        pImmediateContext->lpVtbl->Map(pImmediateContext,(ID3D11Resource *)pcbFractal, 0, D3D11_MAP_WRITE_DISCARD, 0,  &msr);
+        pImmediateContext->Map((ID3D11Resource *)pcbFractal, 0, D3D11_MAP_WRITE_DISCARD, 0,  &msr);
 
-        static MainConstantBuffer* mc;
-        mc = msr.pData;
+		static MainConstantBuffer* mc;
+		mc = (MainConstantBuffer*)msr.pData;
 
         mc->c_height = (int)WINHEIGHT;
         mc->c_width  = (int)WINWIDTH;
@@ -338,36 +355,36 @@ void __cdecl winmain()
         mc->selfShadow = selfShadow;
         mc->zoom = zoom;
 
-        pImmediateContext->lpVtbl->Unmap(pImmediateContext, (ID3D11Resource *)pcbFractal,0);
+        pImmediateContext->Unmap((ID3D11Resource *)pcbFractal,0);
 
         // Set compute shader
-        pImmediateContext->lpVtbl->CSSetShader(pImmediateContext, pCompiledComputeShader, NULL, 0 );
+        pImmediateContext->CSSetShader(pCompiledComputeShader, NULL, 0 );
 
         // For CS output
-        pImmediateContext->lpVtbl->CSSetUnorderedAccessViews(pImmediateContext, 0, 1, &pComputeOutput, NULL );
+        pImmediateContext->CSSetUnorderedAccessViews(0, 1, &pComputeOutput, NULL );
 
         // For CS constant buffer
-        pImmediateContext->lpVtbl->CSSetConstantBuffers(pImmediateContext, 0, 1, &pcbFractal );
+        pImmediateContext->CSSetConstantBuffers(0, 1, &pcbFractal );
 
         // Run the CS
-        pImmediateContext->lpVtbl->Dispatch(pImmediateContext, (WINWIDTH + 3) / 4, (WINHEIGHT + 63) / 64, 1 );
+        pImmediateContext->Dispatch((WINWIDTH + 3) / 4, (WINHEIGHT + 63) / 64, 1 );
 
         // make it visible
-        pSwapChain->lpVtbl->Present( pSwapChain, 0, 0 );
+        pSwapChain->Present(0, 0 );
       }
 
       // release all D3D device related resources
 #if defined(WELLBEHAVIOUR)
-      pImmediateContext->lpVtbl->ClearState(pImmediateContext);
-      pd3dDevice->lpVtbl->Release(pd3dDevice);
-      pSwapChain->lpVtbl->Release(pSwapChain);	 
-      pTexture->lpVtbl->Release(pTexture);	
-      pcbFractal->lpVtbl->Release(pcbFractal);
-      pComputeOutput->lpVtbl->Release(pComputeOutput);
+      pImmediateContext->ClearState();
+      pd3dDevice->Release();
+      pSwapChain->Release();	 
+      pTexture->Release();	
+      pcbFractal->Release();
+      pComputeOutput->Release();
 #endif
 
 #if !NAKED_ENTRY 
-      return (int) msg.wParam;
+	  return 0;// (int)msg.wParam;
 #else
     }
 
