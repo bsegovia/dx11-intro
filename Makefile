@@ -23,9 +23,16 @@ LDFLAGS=/MANIFEST /LTCG /NXCOMPAT /DYNAMICBASE $(LIBS) /DEBUG /MACHINE:X86 \
   /OPT:REF /SAFESEH /INCREMENTAL:NO /SUBSYSTEM:WINDOWS /OPT:ICF /ERRORREPORT:PROMPT \
   /NOLOGO /TLBID:1 /ENTRY:winmain
 
+all: intro
+
+.PHONY: intro
+
+intro: intro.exe
+small: small.exe
+
 OBJS=window.obj
 
-window.obj: window.c qjulia.h
+window.c: qjulia.h
 
 qjulia.h: qjulia.c
 	gcc -E qjulia.c > qjulia.preprocessed.c
@@ -39,8 +46,6 @@ qjulia.h: qjulia.c
 
 intro.exe: $(OBJS)
 	bash --init-file bash.rc -i -c "$(LD) /OUT:intro.exe /PDB:intro.pdb $(LDFLAGS) $(OBJS)"
-
-all: intro.exe
 
 small.exe: $(OBJS)
 	bash --init-file crinkler.rc -i -c "./bin/crinkler.exe /OUT:small.exe /HASHTRIES:500 /SUBSYSTEM:WINDOWS /COMPMODE:SLOW /ORDERTRIES:5000 /TRUNCATEFLOATS:16 /HASHSIZE:500 /PRINT:IMPORTS /ENTRY:winmain /PRINT:LABELS /REPORT:report.html /RANGE:d3d11.dll /RANGE:d3dcompiler_47.dll kernel32.lib d3dcompiler.lib user32.lib d3d11.lib $(OBJS)"

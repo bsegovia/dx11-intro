@@ -20,7 +20,6 @@
 
 RWTexture2D<float4> output : register (u0);
 
-
 // constants that can change the rendering per frame
 
 cbuffer cbCS : register( b0 )
@@ -381,7 +380,7 @@ float4 QJulia( float3 rO ,                // ray origin
 
 [numthreads(4, 64, 1)]
 //****************************************************************************
-void CS_QJulia4D( uint3 Gid : SV_GroupID, uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, uint GI : SV_GroupIndex )
+void main( uint3 Gid : SV_GroupID, uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, uint GI : SV_GroupIndex )
 //****************************************************************************
 { 
     float4 coord = float4((float)DTid.x, (float)DTid.y, 0.0f, 0.0f);

@@ -256,7 +256,7 @@ void __cdecl winmain()
       //
       ID3D11ComputeShader *pCompiledComputeShader;
       ID3DBlob *blob = NULL, *errmsg = NULL;
-      HRESULT hr = D3DCompile(qjulia, sizeof(qjulia), NULL, NULL, NULL, "c", "cs_5_0", 0, 0, &blob, &errmsg);
+      HRESULT hr = D3DCompile(qjulia, sizeof(qjulia), NULL, NULL, NULL, "main", "cs_5_0", 0, 0, &blob, &errmsg);
 #if defined(_DEBUG)
       if (hr != S_OK)
       {
