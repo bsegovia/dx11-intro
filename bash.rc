@@ -1,0 +1,18 @@
+function run_with_bat()
+{
+  batfile=$1; shift
+    tmpfile="$TMP/tmp$$.bat"
+    echo "@echo off" > $tmpfile
+    echo "call \"%$batfile%vsvars32.bat\" >NUL:" >> $tmpfile
+    echo "bash -c \"%*\"" >> $tmpfile
+    cmd /c `cygpath -m "$tmpfile"` "$@"
+    status=$?
+    rm -f $tmpfile
+    return $status
+}
+
+function run_vs()
+{
+  run_with_bat VS120COMNTOOLS "$@"
+}
+
