@@ -34,6 +34,7 @@ DEFINE_GUIDW(IID_ID3D11Texture2D,0x6f15aaf2,0xd208,0x4e89,0x9a,0xb4,0x48,0x95,0x
 // Random number generator
 // see http://www.codeproject.com/KB/recipes/SimpleRNG.aspx
 
+
 // These values are not magical, just the default values Marsaglia used.
 // Any pair of unsigned integers should be fine.
 static unsigned int m_w = 521288629;

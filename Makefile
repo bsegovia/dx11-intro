@@ -31,7 +31,7 @@ intro: intro.exe
 small: small.exe
 
 OBJS=window.obj
-
+REFORMAT_ERROR=
 window.cpp: qjulia.h
 
 qjulia.h: qjulia.c
@@ -42,7 +42,9 @@ qjulia.h: qjulia.c
 	rm qjulia.preprocessed.c qjulia.tmp qjulia.h.tmp
 
 %.obj: %.cpp
-	bash --init-file bash.rc -i -c "$(CC) $(FLAGS) $< /Fo:$@"
+	bash --init-file bash.rc -i -c "$(CC) $(FLAGS) $< /Fo:$@" |\
+	sed 's/\(.*\)pp(\([0-9]*\))\ :\(.*\)/\1pp:\2:1:\3/g'|\
+	sed 's/\(.*\)h(\([0-9]*\))\ :\(.*\)/\1h:\2:1:\3/g'
 
 intro.exe: $(OBJS)
 	bash --init-file bash.rc -i -c "$(LD) /OUT:intro.exe /PDB:intro.pdb $(LDFLAGS) $(OBJS)"
