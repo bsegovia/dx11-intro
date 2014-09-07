@@ -13,7 +13,7 @@
 #include <Windows.h>
 #include <sal.h>
 #include <rpcsal.h>
-#define WELLBEHAVIOUR
+//#define WELLBEHAVIOUR
 #if 0
 #define DEFINE_GUIDW(name, l, w1, w2, b1, b2, b3, b4, b5, b6, b7, b8)\
   const GUID DECLSPEC_SELECTANY name = { l, w2, w2, { b1, b2,  b3,  b4,  b5,  b6,  b7,  b8 } }
@@ -204,17 +204,20 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
       // keep track if the game loop is still running
       static BOOL BStartRunning;
-	  int w, h;
+      int w = 800, h = 600;
 
-	  GetDesktopResolution(&w, &h);
+      //GetDesktopResolution(&w, &h);
 
       // the most simple window
-      HWND hWnd = CreateWindow(L"edit", 0, WS_POPUP | WS_VISIBLE | WS_MAXIMIZE, 0, 0, w, h, 0, 0, 0, 0);
+      HWND hWnd = CreateWindow(L"edit", 0, WS_POPUP | WS_VISIBLE, WINPOSX, WINPOSY, WINWIDTH, WINHEIGHT, 0, 0, 0, 0);
 
-      // don't show the cursor
+	  // don't show the cursor
       ShowCursor(FALSE);
 
-      const static DXGI_SWAP_CHAIN_DESC sd = {{WINWIDTH, WINHEIGHT, {60, 1},  DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED, DXGI_MODE_SCALING_UNSPECIFIED }, {1, 0}, DXGI_USAGE_RENDER_TARGET_OUTPUT, 1, NULL, TRUE, DXGI_SWAP_EFFECT_SEQUENTIAL, 0};
+      const static DXGI_SWAP_CHAIN_DESC sd = {
+        {WINWIDTH, WINHEIGHT, {60, 1},  DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED, DXGI_MODE_SCALING_UNSPECIFIED },
+        {1, 0},
+        DXGI_USAGE_RENDER_TARGET_OUTPUT, 1, NULL, TRUE, DXGI_SWAP_EFFECT_SEQUENTIAL, 0};
 
       //
       DXGI_SWAP_CHAIN_DESC temp;
@@ -242,7 +245,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
       // get access to the back buffer via a texture
       ID3D11Texture2D* pTexture;
-//      pSwapChain->GetBuffer(0, (REFIID) &IID_ID3D11Texture2D, ( LPVOID* )&pTexture );
       pSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&pTexture);
       //
       // Create constant buffer
@@ -277,7 +279,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 #if defined(_DEBUG)
       if (hr != S_OK)
       {
-		  MessageBoxA(NULL, (LPCSTR) errmsg->GetBufferPointer(), "Error", MB_OK | MB_ICONERROR);
+        MessageBoxA(NULL, errmsg->GetBufferPointer(), "Error", MB_OK | MB_ICONERROR);
         MessageBoxA(NULL, "CreateComputerShader() failed", "Error", MB_OK | MB_ICONERROR);
       }
 #endif
@@ -321,8 +323,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         D3D11_MAPPED_SUBRESOURCE msr;
         pImmediateContext->Map((ID3D11Resource *)pcbFractal, 0, D3D11_MAP_WRITE_DISCARD, 0,  &msr);
 
-		static MainConstantBuffer* mc;
-		mc = (MainConstantBuffer*)msr.pData;
+        static MainConstantBuffer* mc;
+        mc = (MainConstantBuffer*) msr.pData;
 
         mc->c_height = (int)WINHEIGHT;
         mc->c_width  = (int)WINWIDTH;
