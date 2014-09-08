@@ -12,13 +12,11 @@
 
 #include <Windows.h>
 #include <sal.h>
+#include <mmsystem.h>
 #include <rpcsal.h>
+
 //#define WELLBEHAVIOUR
-#if 0
-#define DEFINE_GUIDW(name, l, w1, w2, b1, b2, b3, b4, b5, b6, b7, b8)\
-  const GUID DECLSPEC_SELECTANY name = { l, w2, w2, { b1, b2,  b3,  b4,  b5,  b6,  b7,  b8 } }
-DEFINE_GUIDW(IID_ID3D11Texture2D,0x6f15aaf2,0xd208,0x4e89,0x9a,0xb4,0x48,0x95,0x35,0xd3,0x4f,0x9c);
-#endif
+//#define NAKED_ENTRY
 
 #include <d3d11.h>
 #include <d3dcompiler.h>
@@ -30,6 +28,41 @@ DEFINE_GUIDW(IID_ID3D11Texture2D,0x6f15aaf2,0xd208,0x4e89,0x9a,0xb4,0x48,0x95,0x
 #define WINPOSX 200 
 #define WINPOSY 200
 
+// from iq source code
+#define MZK_DURATION    22
+#define MZK_RATE        44100
+#define MZK_NUMCHANNELS 2
+#define MZK_NUMSAMPLES  (MZK_DURATION*MZK_RATE)
+#define MZK_NUMSAMPLESC (MZK_NUMSAMPLES*MZK_NUMCHANNELS)
+static const int wavHeader[11] = {
+  0x46464952,
+  MZK_NUMSAMPLES*2+36,
+  0x45564157,
+  0x20746D66,
+  16,
+  WAVE_FORMAT_PCM|(MZK_NUMCHANNELS<<16),
+  MZK_RATE,
+  MZK_RATE*MZK_NUMCHANNELS*sizeof(short),
+  (MZK_NUMCHANNELS*sizeof(short))|((8*sizeof(short))<<16),
+  0x61746164,
+  MZK_NUMSAMPLES*sizeof(short)
+};
+static short music[MZK_NUMSAMPLESC+22];
+#define PI 3.14159265359f
+
+static float wave(float x) {
+  auto const r = int(x/PI);
+  return r % 2 ? 1.f : -1.f;
+}
+
+static void musicInit(short *buffer) {
+  for (int i=0; i<MZK_NUMSAMPLES; i++) {
+    const auto fl = wave(6.2831f*440.0f * (float)i/(float)MZK_RATE);
+    const auto fr = wave(6.2831f*587.3f * (float)i/(float)MZK_RATE);
+    buffer[2*i+0] = int(fl*32767.0f);
+    buffer[2*i+1] = int(fr*32767.0f);
+  }
+}
 //
 // Random number generator
 // see http://www.codeproject.com/KB/recipes/SimpleRNG.aspx
@@ -131,7 +164,6 @@ UpdateColor( float t[4], float a[4], float b[4] )
   }
 }
 
-#define NAKED_ENTRY 1
 static __forceinline void GetDesktopResolution(int *horizontal, int *vertical)
 {
 	RECT desktop;
@@ -145,21 +177,36 @@ static __forceinline void GetDesktopResolution(int *horizontal, int *vertical)
 	*horizontal = desktop.right;
 	*vertical = desktop.bottom;
 }
+#pragma function(memcpy)
+#pragma function(memset)
+__forceinline void* __cdecl memset(void* _Dst, _In_ int _Val, size_t _Size) {
+	//slow, but probably small
+	char *dst = (char*)_Dst;
 
-#if !NAKED_ENTRY
-// this is a simplified entry point ...
-void __stdcall WinMainCRTStartup()
-{
-  ExitProcess(WinMain(GetModuleHandle(NULL), NULL, NULL, 0));
+	for (size_t x = 0; x < _Size; x++)
+		*dst++ = _Val;
+
+	return _Dst;
 }
 
+void* __cdecl memcpy(void* _Dst, const void* _Src, size_t _Size) {
+	//slow, but probably small
+	char *dst = (char*)_Dst;
+	char *src = (char*)_Src;
+
+	for (size_t x = 0; x < _Size; x++)
+		*dst++ = *src++;
+
+	return _Dst;
+}
+#if !defined(NAKED_ENTRY)
 // this is the main windows entry point ... 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
 #else
   // Take away prolog and epilog, then put a minial prolog back manually with
   // assembly below. The function never returns so no epilog is necessary.
-  __declspec( naked )  void __cdecl winmain()
+__declspec( naked )  void __cdecl winmain()
 
   {
     // Prolog
@@ -280,7 +327,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 #if defined(_DEBUG)
       if (hr != S_OK)
       {
-        MessageBoxA(NULL, errmsg->GetBufferPointer(), "Error", MB_OK | MB_ICONERROR);
+       // MessageBoxA(NULL, errmsg->GetBufferPointer(), "Error", MB_OK | MB_ICONERROR);
         MessageBoxA(NULL, "CreateComputerShader() failed", "Error", MB_OK | MB_ICONERROR);
       }
 #endif
@@ -298,6 +345,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
       // set the game loop to running by default
       MSG msg;
+      musicInit(music);
+      memcpy(music, wavHeader, sizeof(wavHeader));
+      sndPlaySound(LPCWSTR(&music), SND_ASYNC|SND_MEMORY);
 
       while (!BStartRunning)
       {
@@ -375,6 +425,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         // make it visible
         pSwapChain->Present(0, 0 );
       }
+      sndPlaySound(NULL, SND_ASYNC|SND_MEMORY);
 
       // release all D3D device related resources
 #if defined(WELLBEHAVIOUR)
@@ -386,7 +437,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
       pComputeOutput->Release();
 #endif
 
-#if !NAKED_ENTRY 
+#if !defined(NAKED_ENTRY)
+	  ExitProcess(0);
 	  return 0;// (int)msg.wParam;
 #else
     }
