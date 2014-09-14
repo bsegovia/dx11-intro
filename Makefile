@@ -57,5 +57,5 @@ minified.exe: $(MINIFIED_OBJS)
 	"./bin/crinkler.exe /OUT:minified.exe /HASHTRIES:500 /SUBSYSTEM:WINDOWS /COMPMODE:SLOW /ORDERTRIES:5000 /TRUNCATEFLOATS:16 /HASHSIZE:500 /PRINT:IMPORTS /ENTRY:winmain /PRINT:LABELS /REPORT:report.html /RANGE:winmm.dll /RANGE:d3d11.dll /RANGE:d3dcompiler_47.dll winmm.lib kernel32.lib d3dcompiler.lib user32.lib d3d11.lib $(MINIFIED_OBJS)"
 
 clean:
-	rm -rf *html intro.exe small.exe *manifest *.pdb $(MINIFIED_OBJS) $(NORMAL_OBJS)
+	rm -rf *html normal.exe minified.exe *manifest *.pdb $(MINIFIED_OBJS) $(NORMAL_OBJS)
 
