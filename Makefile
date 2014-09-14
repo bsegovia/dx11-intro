@@ -24,16 +24,18 @@ LDFLAGS=/MANIFEST /LTCG /NXCOMPAT /DYNAMICBASE $(LIBS) /DEBUG /MACHINE:X86 \
   /OPT:REF /SAFESEH /INCREMENTAL:NO /SUBSYSTEM:WINDOWS /OPT:ICF /ERRORREPORT:PROMPT \
   /NOLOGO /TLBID:1 /ENTRY:WinMain
 
-all: intro
+all: normal
 
-.PHONY: intro
+.PHONY: minified normal
 
-intro: intro.exe
-small: small.exe
+normal: normal.exe
+minified: minified.exe
 
-OBJS=intro.obj
-REFORMAT_ERROR=
-intro.obj: qjulia.shader.h roadtohell.shader.h
+MINIFIED_OBJS=minified.obj
+NORMAL_OBJS=normal.obj
+
+normal.obj: roadtohell.shader.h
+minified.obj: roadtohell.shader.h
 
 %.shader.h: %.hlsl
 	cpp $< > $@.pre.hlsl
@@ -47,13 +49,13 @@ intro.obj: qjulia.shader.h roadtohell.shader.h
 	sed 's/\(.*\)pp(\([0-9]*\))\ :\(.*\)/\1pp:\2:1:\3/g'|\
 	sed 's/\(.*\)h(\([0-9]*\))\ :\(.*\)/\1h:\2:1:\3/g'
 
-intro.exe: $(OBJS)
-	bash --init-file bash.rc -i -c "$(LD) /OUT:intro.exe /PDB:intro.pdb $(LDFLAGS) $(OBJS)"
+normal.exe: $(NORMAL_OBJS)
+	bash --init-file bash.rc -i -c "$(LD) /OUT:normal.exe /PDB:intro.pdb $(LDFLAGS) $(NORMAL_OBJS)"
 
-small.exe: $(OBJS)
+minified.exe: $(MINIFIED_OBJS)
 	bash --init-file crinkler.rc -i -c \
-	"./bin/crinkler.exe /OUT:small.exe /HASHTRIES:500 /SUBSYSTEM:WINDOWS /COMPMODE:SLOW /ORDERTRIES:5000 /TRUNCATEFLOATS:16 /HASHSIZE:500 /PRINT:IMPORTS /ENTRY:winmain /PRINT:LABELS /REPORT:report.html /RANGE:winmm.dll /RANGE:d3d11.dll /RANGE:d3dcompiler_47.dll winmm.lib kernel32.lib d3dcompiler.lib user32.lib d3d11.lib $(OBJS)"
+	"./bin/crinkler.exe /OUT:minified.exe /HASHTRIES:500 /SUBSYSTEM:WINDOWS /COMPMODE:SLOW /ORDERTRIES:5000 /TRUNCATEFLOATS:16 /HASHSIZE:500 /PRINT:IMPORTS /ENTRY:winmain /PRINT:LABELS /REPORT:report.html /RANGE:winmm.dll /RANGE:d3d11.dll /RANGE:d3dcompiler_47.dll winmm.lib kernel32.lib d3dcompiler.lib user32.lib d3d11.lib $(MINIFIED_OBJS)"
 
 clean:
-	rm -rf *html intro.exe small.exe *manifest *.pdb $(OBJS)
+	rm -rf *html intro.exe small.exe *manifest *.pdb $(MINIFIED_OBJS) $(NORMAL_OBJS)
 
