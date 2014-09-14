@@ -1,6 +1,8 @@
 #pragma once
 #define WELLBEHAVIOUR
 // #define NAKED_ENTRY
+// #define RECOMPILE_SHADER
+#define RECOMPILE_SHADER 1
 #define D3DRUN(X) do {\
   const auto hr = X;\
   if (hr != S_OK)\

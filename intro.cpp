@@ -7,6 +7,9 @@
 #include <rpcsal.h>
 #include <d3d11.h>
 #include <d3dcompiler.h>
+#if RECOMPILE_SHADER
+#include <cstdio>
+#endif
 #include "sys.hpp"
 #include "sound.hpp"
 #include "roadtohell.shader.h"
@@ -102,10 +105,12 @@ static ID3D11ComputeShader *CreateShader(ID3D11Device *device, const char *sourc
   return computeShader;
 }
 
-INLINE void MakeSoundTrack(ID3D11Device *device, ID3D11DeviceContext *immCtx) {
+INLINE void MakeSoundTrack(ID3D11Device *device,
+                           ID3D11DeviceContext *immCtx,
+                           ID3D11ComputeShader *computeShader)
+{
   ID3D11Buffer *soundTrackBuffer, *stagingBuffer;
   ID3D11UnorderedAccessView *unorderedAccessView;
-  ID3D11ComputeShader *computeShader;
   computeShader = CreateShader(device, soundtrack_shader_h, sizeof(soundtrack_shader_h), "main");
   D3DRUN(device->CreateBuffer(&soundTrackBufferDesc, NULL, &soundTrackBuffer));
   D3DRUN(device->CreateBuffer(&stagingBufferDesc, NULL, &stagingBuffer));
@@ -141,6 +146,74 @@ INLINE void MakeSoundTrack(ID3D11Device *device, ID3D11DeviceContext *immCtx) {
 #endif
 }
 
+#if RECOMPILE_SHADER
+class ShaderInclude : public ID3DInclude {
+public:
+    ShaderInclude(){}
+    HRESULT __stdcall Open(
+        D3D_INCLUDE_TYPE IncludeType,
+        LPCSTR pFileName,
+        LPCVOID pParentData,
+        LPCVOID *ppData,
+        UINT *pBytes);
+    HRESULT __stdcall Close(LPCVOID pData);
+};
+
+HRESULT __stdcall ShaderInclude::Open(
+    D3D_INCLUDE_TYPE IncludeType,
+    LPCSTR pFileName,
+    LPCVOID pParentData,
+    LPCVOID *ppData,
+    UINT *pBytes)
+{
+  FILE *fp;
+  fopen_s(&fp, pFileName, "rb");
+  if (fp == NULL) return E_FAIL;
+  fseek(fp, 0L, SEEK_END);
+  const auto sz = ftell(fp);
+  fseek(fp, 0L, SEEK_SET);
+  const auto data = new char[sz+1];
+  fread(data, sz, 1, fp);
+  fclose(fp);
+  if (ppData) *ppData = data;
+  if (pBytes) *pBytes = sz;
+  return S_OK;
+}
+
+HRESULT __stdcall ShaderInclude::Close(LPCVOID pData) {
+  const auto buf = (char*)pData;
+  delete[] buf;
+  return S_OK;
+}
+
+static ID3D11ComputeShader *CreateShader(ID3D11Device *device, LPCWSTR fileName, const char *entry)
+{
+  ShaderInclude include;
+  ID3D11ComputeShader *computeShader;
+  ID3DBlob *blob = NULL, *errmsg = NULL;
+  const auto hr = D3DCompileFromFile(fileName, NULL, &include, entry,
+                                     "cs_5_0", 0, 0, &blob, &errmsg);
+#if defined(_DEBUG)
+  if (hr != S_OK) {
+    MessageBoxA(NULL, LPCSTR(errmsg->GetBufferPointer()), "Error", MB_OK | MB_ICONERROR);
+    MessageBoxA(NULL, "CreateComputeShader() failed", "Error", MB_OK | MB_ICONERROR);
+  }
+#endif
+  D3DRUN(device->CreateComputeShader(blob->GetBufferPointer(),
+                                     blob->GetBufferSize(), NULL,
+                                     &computeShader));
+  return computeShader;
+}
+
+static ID3D11ComputeShader *Reload(ID3D11Device *device, ID3D11DeviceContext *immCtx) {
+  const auto renderShader = CreateShader(device, L"roadtohell.hlsl", "main");
+  const auto soundShader = CreateShader(device, L"soundtrack.hlsl", "main");
+  MakeSoundTrack(device, immCtx, soundShader);
+  sndPlaySound(LPCWSTR(&wav), SND_ASYNC|SND_MEMORY);
+  return renderShader;
+}
+#endif
+
 #if !defined(NAKED_ENTRY)
 // this is the main windows entry point ...
 int WINAPI WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, LPSTR /*lpCmdLine*/, int /*nCmdShow*/) {
@@ -171,9 +244,9 @@ __declspec(naked)  void __cdecl winmain() {
     DWORD StartTime;
 
     // keep track if the game loop is still running
-    BOOL BStartRunning = FALSE;
+    bool running = true;
     // int w = 800, h = 600;
-    // GetDesktopResolution(&w, &h);
+    // GetDesktopResolution(w, h);
 
     // the most simple window
     const auto hWnd = CreateWindow(L"edit", 0, WS_CAPTION | WS_POPUP |
@@ -203,7 +276,8 @@ __declspec(naked)  void __cdecl winmain() {
       &immCtx));
 
     // Load the source track
-    MakeSoundTrack(device, immCtx);
+    const auto soundShader = CreateShader(device, soundtrack_shader_h, sizeof(soundtrack_shader_h), "main");
+    MakeSoundTrack(device, immCtx, soundShader);
 
     // get access to the back buffer via a texture
     ID3D11Texture2D* texture;
@@ -227,16 +301,21 @@ __declspec(naked)  void __cdecl winmain() {
 #endif
     sndPlaySound(LPCWSTR(&wav), SND_ASYNC|SND_MEMORY);
 
-    while (!BStartRunning) {
+    while (running) {
 #if defined(WELLBEHAVIOUR)
-      // Just remove the message
       PeekMessage(&msg, hWnd, 0, 0, PM_REMOVE);
 #endif
 
       // go out of game loop and shutdown
       if (GetAsyncKeyState(VK_ESCAPE))
-        BStartRunning = TRUE;
+        running = false;
 
+#if RECOMPILE_SHADER
+      if (GetAsyncKeyState('A')) {
+        computeShader = Reload(device, immCtx);
+        StartTime = GetTickCount();
+      }
+#endif
       // Fill constant buffer
       D3D11_MAPPED_SUBRESOURCE msr;
       immCtx->Map((ID3D11Resource*) constantBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0,  &msr);
