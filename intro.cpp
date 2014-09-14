@@ -98,7 +98,7 @@ static ID3D11ComputeShader *CreateShader(ID3D11Device *device, const char *sourc
 #endif
   D3DRUN(device->CreateComputeShader(blob->GetBufferPointer(),
                                      blob->GetBufferSize(), NULL,
-									 &computeShader));
+                                     &computeShader));
   return computeShader;
 }
 
@@ -135,7 +135,7 @@ INLINE void MakeSoundTrack(ID3D11Device *device, ID3D11DeviceContext *immCtx) {
 #if defined(WELLBEHAVIOUR)
   immCtx->Unmap((ID3D11Resource*)stagingBuffer, 0);
   stagingBuffer->Release();
-  soundTrackBuffer->Release();	
+  soundTrackBuffer->Release();
   unorderedAccessView->Release();
   computeShader->Release();
 #endif
@@ -210,10 +210,10 @@ __declspec(naked)  void __cdecl winmain() {
     D3DRUN(swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&texture));
 
     // Create constant buffer
-	D3DRUN(device->CreateBuffer(&constantBufferDesc, NULL, &constantBuffer));
+    D3DRUN(device->CreateBuffer(&constantBufferDesc, NULL, &constantBuffer));
 
     // create shader unordered access view on back buffer for compute shader to write into texture
-	D3DRUN(device->CreateUnorderedAccessView((ID3D11Resource*)texture, NULL, &unorderedAccessView));
+    D3DRUN(device->CreateUnorderedAccessView((ID3D11Resource*)texture, NULL, &unorderedAccessView));
 
     // load compute shader
     computeShader = CreateShader(device, roadtohell_shader_h, sizeof(roadtohell_shader_h), "main");
@@ -258,8 +258,8 @@ __declspec(naked)  void __cdecl winmain() {
 #if defined(WELLBEHAVIOUR)
     immCtx->ClearState();
     device->Release();
-    swapChain->Release();	
-    texture->Release();	
+    swapChain->Release();
+    texture->Release();
     constantBuffer->Release();
     unorderedAccessView->Release();
 #endif
