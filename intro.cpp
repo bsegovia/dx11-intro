@@ -75,30 +75,30 @@ static const D3D11_BUFFER_DESC stagingBufferDesc = {
   sizeof(int)
 };
 
-INLINE void GetDesktopResolution(int *horizontal, int *vertical) {
+INLINE void GetDesktopResolution(int &w, int &h) {
   RECT desktop;
-  const HWND hDesktop = GetDesktopWindow();
+  const auto hDesktop = GetDesktopWindow();
   GetWindowRect(hDesktop, &desktop);
-  *horizontal = desktop.right;
-  *vertical = desktop.bottom;
+  w = desktop.right;
+  h = desktop.bottom;
 }
 
-static ID3D11ComputeShader *CreateShader(ID3D11Device *device, const char *source, size_t sz, const char *entry) {
+static ID3D11ComputeShader *CreateShader(ID3D11Device *device, const char *source,
+                                         size_t sz, const char *entry)
+{
   ID3D11ComputeShader *computeShader;
   ID3DBlob *blob = NULL, *errmsg = NULL;
-  HRESULT hr = D3DCompile(source, sz,
-      NULL, NULL, NULL, entry, "cs_5_0", 0, 0, &blob, &errmsg);
+  const auto hr = D3DCompile(source, sz, NULL, NULL, NULL, entry,
+                             "cs_5_0", 0, 0, &blob, &errmsg);
 #if defined(_DEBUG)
   if (hr != S_OK) {
     MessageBoxA(NULL, (LPCSTR) errmsg->GetBufferPointer(), "Error", MB_OK | MB_ICONERROR);
     MessageBoxA(NULL, "CreateComputeShader() failed", "Error", MB_OK | MB_ICONERROR);
   }
 #endif
-  device->CreateComputeShader(blob->GetBufferPointer(), blob->GetBufferSize(), NULL, &computeShader);
-#if defined(_DEBUG)
-  if (hr != S_OK)
-    MessageBoxA(NULL, "CreateComputeShader() failed", "Error", MB_OK | MB_ICONERROR);
-#endif
+  D3DRUN(device->CreateComputeShader(blob->GetBufferPointer(),
+                                     blob->GetBufferSize(), NULL,
+									 &computeShader));
   return computeShader;
 }
 
@@ -107,8 +107,8 @@ INLINE void MakeSoundTrack(ID3D11Device *device, ID3D11DeviceContext *immCtx) {
   ID3D11UnorderedAccessView *unorderedAccessView;
   ID3D11ComputeShader *computeShader;
   computeShader = CreateShader(device, soundtrack_shader_h, sizeof(soundtrack_shader_h), "main");
-  device->CreateBuffer(&soundTrackBufferDesc, NULL, &soundTrackBuffer);
-  device->CreateBuffer(&stagingBufferDesc, NULL, &stagingBuffer);
+  D3DRUN(device->CreateBuffer(&soundTrackBufferDesc, NULL, &soundTrackBuffer));
+  D3DRUN(device->CreateBuffer(&stagingBufferDesc, NULL, &stagingBuffer));
 
   // Create staging buffer
   // This is used to read the results back to the CPU
@@ -117,8 +117,8 @@ INLINE void MakeSoundTrack(ID3D11Device *device, ID3D11DeviceContext *immCtx) {
   stagingBufferDesc.Usage = D3D11_USAGE_STAGING;
   stagingBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
   stagingBufferDesc.StructureByteStride = sizeof(int);
-  device->CreateBuffer(&stagingBufferDesc, nullptr, &stagingBuffer);
-  device->CreateUnorderedAccessView((ID3D11Resource*)soundTrackBuffer, NULL, &unorderedAccessView);
+  D3DRUN(device->CreateBuffer(&stagingBufferDesc, nullptr, &stagingBuffer));
+  D3DRUN(device->CreateUnorderedAccessView((ID3D11Resource*)soundTrackBuffer, NULL, &unorderedAccessView));
 
   // Run the sound shader
   immCtx->CSSetShader(computeShader, NULL, 0);
@@ -128,12 +128,13 @@ INLINE void MakeSoundTrack(ID3D11Device *device, ID3D11DeviceContext *immCtx) {
   // Download the data
   D3D11_MAPPED_SUBRESOURCE mappedResource = {0};
   immCtx->CopyResource(stagingBuffer, soundTrackBuffer);
-  immCtx->Map(stagingBuffer, 0, D3D11_MAP_READ, 0, &mappedResource);
+  D3DRUN(immCtx->Map(stagingBuffer, 0, D3D11_MAP_READ, 0, &mappedResource));
   auto const src = (const int*)mappedResource.pData;
   for (int i = 0; i < 11; ++i) music[i] = wav[i];
   for (int i = 0; i < MZK_NUMSAMPLES; ++i) music[11+i] = src[i];
 #if defined(WELLBEHAVIOUR)
-  stagingBuffer->Release();	
+  immCtx->Unmap((ID3D11Resource*)stagingBuffer, 0);
+  stagingBuffer->Release();
   soundTrackBuffer->Release();	
   unorderedAccessView->Release();
   computeShader->Release();
@@ -142,7 +143,7 @@ INLINE void MakeSoundTrack(ID3D11Device *device, ID3D11DeviceContext *immCtx) {
 
 #if !defined(NAKED_ENTRY)
 // this is the main windows entry point ...
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+int WINAPI WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, LPSTR /*lpCmdLine*/, int /*nCmdShow*/) {
 #else
 // Take away prolog and epilog, then put a minial prolog back manually with
 // assembly below. The function never returns so no epilog is necessary.
@@ -175,7 +176,7 @@ __declspec(naked)  void __cdecl winmain() {
     // GetDesktopResolution(&w, &h);
 
     // the most simple window
-    auto hWnd = CreateWindow(L"edit", 0, WS_CAPTION | WS_POPUP |
+    const auto hWnd = CreateWindow(L"edit", 0, WS_CAPTION | WS_POPUP |
       WS_VISIBLE, WINPOSX, WINPOSY, WINWIDTH, WINHEIGHT, 0, 0, 0, 0);
     // SetWindowPos(hWnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
     // don't show the cursor
@@ -187,7 +188,7 @@ __declspec(naked)  void __cdecl winmain() {
       DXGI_USAGE_SHADER_INPUT;
     swapChainDesc.OutputWindow = hWnd;
 
-    D3D11CreateDeviceAndSwapChain(
+    D3DRUN(D3D11CreateDeviceAndSwapChain(
       NULL,
       D3D_DRIVER_TYPE_HARDWARE,
       NULL,
@@ -199,20 +200,20 @@ __declspec(naked)  void __cdecl winmain() {
       &swapChain,
       &device,
       NULL,
-      &immCtx);
+      &immCtx));
 
     // Load the source track
     MakeSoundTrack(device, immCtx);
 
     // get access to the back buffer via a texture
     ID3D11Texture2D* texture;
-    swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&texture);
+    D3DRUN(swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&texture));
 
     // Create constant buffer
-    device->CreateBuffer(&constantBufferDesc, NULL, &constantBuffer);
+	D3DRUN(device->CreateBuffer(&constantBufferDesc, NULL, &constantBuffer));
 
     // create shader unordered access view on back buffer for compute shader to write into texture
-    device->CreateUnorderedAccessView((ID3D11Resource*)texture, NULL, &unorderedAccessView);
+	D3DRUN(device->CreateUnorderedAccessView((ID3D11Resource*)texture, NULL, &unorderedAccessView));
 
     // load compute shader
     computeShader = CreateShader(device, roadtohell_shader_h, sizeof(roadtohell_shader_h), "main");
