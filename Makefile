@@ -33,14 +33,14 @@ small: small.exe
 
 OBJS=window.obj
 REFORMAT_ERROR=
-window.cpp: qjulia.h
+window.cpp: qjulia.shader.h roadtohell.shader.h
 
-qjulia.h: qjulia.c
-	gcc -E qjulia.c > qjulia.preprocessed.c
-	cat qjulia.preprocessed.c | sed 's/#.*//g' > qjulia.tmp
-	./bin/shader_minifier.exe --hlsl qjulia.tmp -o qjulia.h.tmp
-	cat qjulia.h.tmp | sed 's/const\ char\ \*qjulia_tmp/static const char qjulia[]/g' > qjulia.h
-	rm qjulia.preprocessed.c qjulia.tmp qjulia.h.tmp
+%.shader.h: %.hlsl
+	cpp $< > $@.pre.hlsl
+	cat $@.pre.hlsl | sed 's/#.*//g' > $@.tmp
+	./bin/shader_minifier.exe --hlsl $@.tmp -o $@.h.tmp
+	cat $@.h.tmp | sed 's/const\ char\ \*\(.*\)_tmp/static const char \1[]/g' > $@
+	rm $@.pre.hlsl $@.tmp $@.h.tmp
 
 %.obj: %.cpp
 	bash --init-file bash.rc -i -c "$(CC) $(FLAGS) $< /Fo:$@" |\

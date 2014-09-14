@@ -20,7 +20,7 @@
 
 #include <d3d11.h>
 #include <d3dcompiler.h>
-#include "qjulia.h"
+#include "qjulia.shader.h"
 
 // define the size of the window
 #define WINWIDTH 1280 
@@ -63,10 +63,6 @@ static void musicInit(short *buffer) {
     buffer[2*i+1] = int(fr*32767.0f);
   }
 }
-//
-// Random number generator
-// see http://www.codeproject.com/KB/recipes/SimpleRNG.aspx
-
 
 // These values are not magical, just the default values Marsaglia used.
 // Any pair of unsigned integers should be fine.
@@ -225,12 +221,10 @@ __declspec( naked )  void __cdecl winmain()
       ID3D11Device *pd3dDevice;
       IDXGISwapChain *pSwapChain;
       ID3D11DeviceContext *pImmediateContext;
-
-      ID3D11Buffer*		    	pcbFractal;      // constant buffer
-      ID3D11UnorderedAccessView*  pComputeOutput;  // compute output
+      ID3D11Buffer* pcbFractal;
+      ID3D11UnorderedAccessView*pComputeOutput;
 
       static D3D11_BUFFER_DESC Desc;
-
 
       static float Epsilon                    = 0.003f;
       static float ColorT                     = 0.0f;
