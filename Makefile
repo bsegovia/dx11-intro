@@ -31,9 +31,9 @@ all: intro
 intro: intro.exe
 small: small.exe
 
-OBJS=window.obj
+OBJS=intro.obj
 REFORMAT_ERROR=
-window.cpp: qjulia.shader.h roadtohell.shader.h
+intro.obj: qjulia.shader.h roadtohell.shader.h
 
 %.shader.h: %.hlsl
 	cpp $< > $@.pre.hlsl

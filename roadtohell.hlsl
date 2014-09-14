@@ -6,7 +6,7 @@ cbuffer cb : register(b0) {
   float iGlobalTime;
 };
 
-float2 mod(float2 x, float2 y) { return x - floor(x/y); }
+float2 mod(float2 x, float2 y) { return x - y*floor(x/y); }
 float2 rotate(float2 k,float t) {
   return float2(cos(t)*k.x-sin(t)*k.y,sin(t)*k.x+cos(t)*k.y);
 }
@@ -39,7 +39,7 @@ float draw_scene(float3 p, float speed) {
 }
 
 [numthreads(8, 8, 1)]
-void main(uint3 Gid : SV_GroupID, uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, uint GI : SV_GroupIndex)
+void main(uint3 DTid : SV_DispatchThreadID)
 {
   float speed=iGlobalTime*0.2975f;
   float ground_x=1.0f-0.325f*sin(PI*speed*0.25f);
