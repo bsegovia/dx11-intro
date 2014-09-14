@@ -1,9 +1,11 @@
 static const float PI=3.14159265358979323846f;
 
+#define RESOLUTION _r
+#define GLOBALTIME _t
 RWTexture2D<float4> output : register (u0);
 cbuffer cb : register(b0) {
-  float2 iResolution;
-  float iGlobalTime;
+  float2 RESOLUTION;
+  float GLOBALTIME;
 };
 
 float2 mod(float2 x, float2 y) { return x - y*floor(x/y); }
@@ -39,14 +41,13 @@ float draw_scene(float3 p, float speed) {
 }
 
 [numthreads(8, 8, 1)]
-void main(uint3 DTid : SV_DispatchThreadID)
-{
-  float speed=iGlobalTime*0.2975f;
+void main(uint3 DTid : SV_DispatchThreadID) {
+  float speed=GLOBALTIME*0.2975f;
   float ground_x=1.0f-0.325f*sin(PI*speed*0.25f);
   float ground_y=1.0f;
   float ground_z=0.5f;
   float2 gl_FragCoord = float2(DTid.xy);
-  float2 position=(gl_FragCoord.xy/iResolution.xy);
+  float2 position=(gl_FragCoord.xy/RESOLUTION.xy);
   float2 p=-1.0f+2.0f*position;
   float3 dir=normalize(float3(p*float2(1.77f,1.0f),1.0f));    // screen ratio (x,y) fov (z)
   dir.zx=rotate(dir.zx,-PI*speed*0.25f);                      // rotation y

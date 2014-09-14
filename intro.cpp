@@ -10,6 +10,7 @@
 #include "sys.hpp"
 #include "sound.hpp"
 #include "roadtohell.shader.h"
+#include "soundtrack.shader.h"
 
 #define WINWIDTH 1280
 #define WINHEIGHT 720
@@ -17,7 +18,7 @@
 #define WINPOSY 200
 
 // from iq source code
-static const int wavHeader[11] = {
+static const int wav[11] = {
   0x46464952,
   MZK_NUMSAMPLES*2+36,
   0x45564157,
@@ -30,22 +31,8 @@ static const int wavHeader[11] = {
   0x61746164,
   MZK_NUMSAMPLES*sizeof(short)
 };
-static short music[MZK_NUMSAMPLESC+22];
+static int music[11+MZK_NUMSAMPLES];
 #define PI 3.14159265359f
-
-static float wave(float x) {
-  auto const r = int(x/PI);
-  return r % 2 ? 1.f : -1.f;
-}
-
-static void musicInit(short *buffer) {
-  for (int i=0; i<MZK_NUMSAMPLES; i++) {
-    const auto fl = wave(6.2831f*440.0f * (float)i/(float)MZK_RATE);
-    const auto fr = wave(6.2831f*587.3f * (float)i/(float)MZK_RATE);
-    buffer[2*i+0] = int(fl*32767.0f);
-    buffer[2*i+1] = int(fr*32767.0f);
-  }
-}
 
 struct MainConstantBuffer {
   float iResolution[2];
@@ -61,7 +48,7 @@ static DXGI_SWAP_CHAIN_DESC swapChainDesc = {
   DXGI_USAGE_RENDER_TARGET_OUTPUT, 1, NULL, TRUE, DXGI_SWAP_EFFECT_SEQUENTIAL, 0
 };
 
-static const D3D11_BUFFER_DESC Desc = {
+static const D3D11_BUFFER_DESC constantBufferDesc = {
   ((sizeof(MainConstantBuffer)+15) / 16) * 16,
   D3D11_USAGE_DYNAMIC,
   D3D11_BIND_CONSTANT_BUFFER,
@@ -70,12 +57,87 @@ static const D3D11_BUFFER_DESC Desc = {
   0
 };
 
+static const D3D11_BUFFER_DESC soundTrackBufferDesc = {
+  MZK_NUMSAMPLES*sizeof(int),
+  D3D11_USAGE_DEFAULT,
+  D3D11_BIND_UNORDERED_ACCESS|D3D11_BIND_SHADER_RESOURCE,
+  0,
+  D3D11_RESOURCE_MISC_BUFFER_STRUCTURED,
+  sizeof(int)
+};
+
+static const D3D11_BUFFER_DESC stagingBufferDesc = {
+  MZK_NUMSAMPLES*sizeof(int),
+  D3D11_USAGE_STAGING,
+  0,
+  D3D11_CPU_ACCESS_READ,
+  0,
+  sizeof(int)
+};
+
 INLINE void GetDesktopResolution(int *horizontal, int *vertical) {
   RECT desktop;
   const HWND hDesktop = GetDesktopWindow();
   GetWindowRect(hDesktop, &desktop);
   *horizontal = desktop.right;
   *vertical = desktop.bottom;
+}
+
+static ID3D11ComputeShader *CreateShader(ID3D11Device *device, const char *source, size_t sz, const char *entry) {
+  ID3D11ComputeShader *computeShader;
+  ID3DBlob *blob = NULL, *errmsg = NULL;
+  HRESULT hr = D3DCompile(source, sz,
+      NULL, NULL, NULL, entry, "cs_5_0", 0, 0, &blob, &errmsg);
+#if defined(_DEBUG)
+  if (hr != S_OK) {
+    MessageBoxA(NULL, (LPCSTR) errmsg->GetBufferPointer(), "Error", MB_OK | MB_ICONERROR);
+    MessageBoxA(NULL, "CreateComputeShader() failed", "Error", MB_OK | MB_ICONERROR);
+  }
+#endif
+  device->CreateComputeShader(blob->GetBufferPointer(), blob->GetBufferSize(), NULL, &computeShader);
+#if defined(_DEBUG)
+  if (hr != S_OK)
+    MessageBoxA(NULL, "CreateComputeShader() failed", "Error", MB_OK | MB_ICONERROR);
+#endif
+  return computeShader;
+}
+
+INLINE void MakeSoundTrack(ID3D11Device *device, ID3D11DeviceContext *immCtx) {
+  ID3D11Buffer *soundTrackBuffer, *stagingBuffer;
+  ID3D11UnorderedAccessView *unorderedAccessView;
+  ID3D11ComputeShader *computeShader;
+  computeShader = CreateShader(device, soundtrack_shader_h, sizeof(soundtrack_shader_h), "main");
+  device->CreateBuffer(&soundTrackBufferDesc, NULL, &soundTrackBuffer);
+  device->CreateBuffer(&stagingBufferDesc, NULL, &stagingBuffer);
+
+  // Create staging buffer
+  // This is used to read the results back to the CPU
+  D3D11_BUFFER_DESC stagingBufferDesc = {0};
+  stagingBufferDesc.ByteWidth = MZK_NUMSAMPLES * sizeof(int);
+  stagingBufferDesc.Usage = D3D11_USAGE_STAGING;
+  stagingBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+  stagingBufferDesc.StructureByteStride = sizeof(int);
+  device->CreateBuffer(&stagingBufferDesc, nullptr, &stagingBuffer);
+  device->CreateUnorderedAccessView((ID3D11Resource*)soundTrackBuffer, NULL, &unorderedAccessView);
+
+  // Run the sound shader
+  immCtx->CSSetShader(computeShader, NULL, 0);
+  immCtx->CSSetUnorderedAccessViews(0, 1, &unorderedAccessView, NULL);
+  immCtx->Dispatch((MZK_NUMSAMPLES+1023)/1024, 1, 1);
+
+  // Download the data
+  D3D11_MAPPED_SUBRESOURCE mappedResource = {0};
+  immCtx->CopyResource(stagingBuffer, soundTrackBuffer);
+  immCtx->Map(stagingBuffer, 0, D3D11_MAP_READ, 0, &mappedResource);
+  auto const src = (const int*)mappedResource.pData;
+  for (int i = 0; i < 11; ++i) music[i] = wav[i];
+  for (int i = 0; i < MZK_NUMSAMPLES; ++i) music[11+i] = src[i];
+#if defined(WELLBEHAVIOUR)
+  stagingBuffer->Release();	
+  soundTrackBuffer->Release();	
+  unorderedAccessView->Release();
+  computeShader->Release();
+#endif
 }
 
 #if !defined(NAKED_ENTRY)
@@ -97,11 +159,12 @@ __declspec(naked)  void __cdecl winmain() {
   {
 #endif
     // D3D 11 device variables
-    ID3D11Device *pd3dDevice;
-    IDXGISwapChain *pSwapChain;
-    ID3D11DeviceContext *pImmediateContext;
-    ID3D11Buffer *pcbFractal;
-    ID3D11UnorderedAccessView *pComputeOutput;
+    ID3D11Device *device;
+    IDXGISwapChain *swapChain;
+    ID3D11DeviceContext *immCtx;
+    ID3D11Buffer *constantBuffer;
+    ID3D11UnorderedAccessView *unorderedAccessView;
+    ID3D11ComputeShader *computeShader;
 
     // timer global variables
     DWORD StartTime;
@@ -112,12 +175,16 @@ __declspec(naked)  void __cdecl winmain() {
     // GetDesktopResolution(&w, &h);
 
     // the most simple window
-    HWND hWnd = CreateWindow(L"edit", 0, WS_CAPTION | WS_POPUP | WS_VISIBLE, WINPOSX, WINPOSY, WINWIDTH, WINHEIGHT, 0, 0, 0, 0);
+    auto hWnd = CreateWindow(L"edit", 0, WS_CAPTION | WS_POPUP |
+      WS_VISIBLE, WINPOSX, WINPOSY, WINWIDTH, WINHEIGHT, 0, 0, 0, 0);
     // SetWindowPos(hWnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
     // don't show the cursor
     // ShowCursor(FALSE);
 
-    swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT | DXGI_USAGE_UNORDERED_ACCESS | DXGI_USAGE_SHADER_INPUT;
+    swapChainDesc.BufferUsage =
+      DXGI_USAGE_RENDER_TARGET_OUTPUT |
+      DXGI_USAGE_UNORDERED_ACCESS |
+      DXGI_USAGE_SHADER_INPUT;
     swapChainDesc.OutputWindow = hWnd;
 
     D3D11CreateDeviceAndSwapChain(
@@ -129,36 +196,26 @@ __declspec(naked)  void __cdecl winmain() {
       0,
       D3D11_SDK_VERSION,
       &swapChainDesc,
-      &pSwapChain,
-      &pd3dDevice,
+      &swapChain,
+      &device,
       NULL,
-      &pImmediateContext);
+      &immCtx);
+
+    // Load the source track
+    MakeSoundTrack(device, immCtx);
 
     // get access to the back buffer via a texture
-    ID3D11Texture2D* pTexture;
-    pSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&pTexture);
+    ID3D11Texture2D* texture;
+    swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&texture);
 
     // Create constant buffer
-    pd3dDevice->CreateBuffer(&Desc, NULL, &pcbFractal);
+    device->CreateBuffer(&constantBufferDesc, NULL, &constantBuffer);
 
     // create shader unordered access view on back buffer for compute shader to write into texture
-    pd3dDevice->CreateUnorderedAccessView((ID3D11Resource*)pTexture, NULL, &pComputeOutput );
+    device->CreateUnorderedAccessView((ID3D11Resource*)texture, NULL, &unorderedAccessView);
 
-    // compile a compute shader
-    ID3D11ComputeShader *pCompiledComputeShader;
-    ID3DBlob *blob = NULL, *errmsg = NULL;
-    HRESULT hr = D3DCompile(roadtohell_shader_h, sizeof(roadtohell_shader_h), NULL, NULL, NULL, "main", "cs_5_0", 0, 0, &blob, &errmsg);
-#if defined(_DEBUG)
-    if (hr != S_OK) {
-      MessageBoxA(NULL, (LPCSTR) errmsg->GetBufferPointer(), "Error", MB_OK | MB_ICONERROR);
-      MessageBoxA(NULL, "CreateComputerShader() failed", "Error", MB_OK | MB_ICONERROR);
-    }
-#endif
-    pd3dDevice->CreateComputeShader(blob->GetBufferPointer(), blob->GetBufferSize(), NULL, &pCompiledComputeShader);
-#if defined(_DEBUG)
-    if (hr != S_OK)
-      MessageBoxA(NULL, "CreateComputerShader() failed", "Error", MB_OK | MB_ICONERROR);
-#endif
+    // load compute shader
+    computeShader = CreateShader(device, roadtohell_shader_h, sizeof(roadtohell_shader_h), "main");
 
     // setup timer
     StartTime = GetTickCount();
@@ -167,9 +224,7 @@ __declspec(naked)  void __cdecl winmain() {
 #if defined(WELLBEHAVIOUR)
     MSG msg;
 #endif
-    musicInit(music);
-    memcpy(music, wavHeader, sizeof(wavHeader));
-    //sndPlaySound(LPCWSTR(&music), SND_ASYNC|SND_MEMORY);
+    sndPlaySound(LPCWSTR(&wav), SND_ASYNC|SND_MEMORY);
 
     while (!BStartRunning) {
 #if defined(WELLBEHAVIOUR)
@@ -183,29 +238,29 @@ __declspec(naked)  void __cdecl winmain() {
 
       // Fill constant buffer
       D3D11_MAPPED_SUBRESOURCE msr;
-      pImmediateContext->Map((ID3D11Resource*) pcbFractal, 0, D3D11_MAP_WRITE_DISCARD, 0,  &msr);
+      immCtx->Map((ID3D11Resource*) constantBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0,  &msr);
 
       const auto mc = (MainConstantBuffer*) msr.pData;
       mc->iResolution[0] = float(WINWIDTH);
       mc->iResolution[1] = float(WINHEIGHT);
       mc->iGlobalTime = (GetTickCount() - StartTime) / 1000.0f;
-      pImmediateContext->Unmap((ID3D11Resource*) pcbFractal,0);
-      pImmediateContext->CSSetShader(pCompiledComputeShader, NULL, 0 );
-      pImmediateContext->CSSetUnorderedAccessViews(0, 1, &pComputeOutput, NULL );
-      pImmediateContext->CSSetConstantBuffers(0, 1, &pcbFractal );
-      pImmediateContext->Dispatch((WINWIDTH + 7) / 8, (WINHEIGHT + 7) / 8, 1 );
-      pSwapChain->Present(0, 0 );
+      immCtx->Unmap((ID3D11Resource*) constantBuffer,0);
+      immCtx->CSSetShader(computeShader, NULL, 0);
+      immCtx->CSSetUnorderedAccessViews(0, 1, &unorderedAccessView, NULL);
+      immCtx->CSSetConstantBuffers(0, 1, &constantBuffer);
+      immCtx->Dispatch((WINWIDTH + 7) / 8, (WINHEIGHT + 7) / 8, 1);
+      swapChain->Present(0, 0);
     }
     sndPlaySound(NULL, SND_ASYNC|SND_MEMORY);
 
     // release all D3D device related resources
 #if defined(WELLBEHAVIOUR)
-    pImmediateContext->ClearState();
-    pd3dDevice->Release();
-    pSwapChain->Release();	
-    pTexture->Release();	
-    pcbFractal->Release();
-    pComputeOutput->Release();
+    immCtx->ClearState();
+    device->Release();
+    swapChain->Release();	
+    texture->Release();	
+    constantBuffer->Release();
+    unorderedAccessView->Release();
 #endif
 
 #if !defined(NAKED_ENTRY)

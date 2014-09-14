@@ -20,7 +20,7 @@ LIBS=d3d11.lib \
   odbc32.lib \
   odbccp32.lib
 
-LDFLAGS=/MANIFEST /LTCG /NXCOMPAT /DYNAMICBASE $(LIBS) /DEBUG /MACHINE:X86 \
+LDFLAGS=/MANIFEST /NXCOMPAT /DYNAMICBASE $(LIBS) /DEBUG /MACHINE:X86 \
   /OPT:REF /SAFESEH /INCREMENTAL:NO /SUBSYSTEM:WINDOWS /OPT:ICF /ERRORREPORT:PROMPT \
   /NOLOGO /TLBID:1 /ENTRY:WinMain
 
@@ -34,8 +34,8 @@ minified: minified.exe
 MINIFIED_OBJS=minified.obj
 NORMAL_OBJS=normal.obj
 
-normal.obj: roadtohell.shader.h
-minified.obj: roadtohell.shader.h
+normal.obj: roadtohell.shader.h soundtrack.shader.h intro.cpp normal.cpp sys.hpp
+minified.obj: roadtohell.shader.h soundtrack.shader.h intro.cpp minified.cpp sys.hpp
 
 %.shader.h: %.hlsl
 	cpp $< > $@.pre.hlsl

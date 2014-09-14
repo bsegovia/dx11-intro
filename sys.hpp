@@ -13,6 +13,6 @@ static void* __cdecl memcpy(void* _Dst, const void* _Src, size_t _Size) {
   for (size_t x = 0; x < _Size; x++) *dst++ = *src++;
   return _Dst;
 }
-
+#define ALIGN(X) __declspec(align(X))
 #define INLINE __forceinline
 
