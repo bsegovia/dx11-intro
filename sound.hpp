@@ -1,6 +1,6 @@
 #ifndef SOUND_HPP
 #define SOUND_HPP
-#define MZK_DURATION    22
+#define MZK_DURATION    60
 #define MZK_RATE        44100
 #define MZK_NUMCHANNELS 2
 #define MZK_NUMSAMPLES  (MZK_DURATION*MZK_RATE)

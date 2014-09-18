@@ -15,10 +15,10 @@
 #include "roadtohell.shader.h"
 #include "soundtrack.shader.h"
 
-#define WINWIDTH 1280
-#define WINHEIGHT 720
-#define WINPOSX 200
-#define WINPOSY 200
+#define WINWIDTH 800
+#define WINHEIGHT 600
+#define WINPOSX (1920-800)
+#define WINPOSY 0
 
 // from iq source code
 static const int wav[11] = {
@@ -107,11 +107,11 @@ static ID3D11ComputeShader *CreateShader(ID3D11Device *device, const char *sourc
 
 INLINE void MakeSoundTrack(ID3D11Device *device,
                            ID3D11DeviceContext *immCtx,
-                           ID3D11ComputeShader *computeShader)
+                           ID3D11ComputeShader *computeShader,
+                           int *samples)
 {
   ID3D11Buffer *soundTrackBuffer, *stagingBuffer;
   ID3D11UnorderedAccessView *unorderedAccessView;
-  computeShader = CreateShader(device, soundtrack_shader_h, sizeof(soundtrack_shader_h), "main");
   D3DRUN(device->CreateBuffer(&soundTrackBufferDesc, NULL, &soundTrackBuffer));
   D3DRUN(device->CreateBuffer(&stagingBufferDesc, NULL, &stagingBuffer));
 
@@ -135,8 +135,8 @@ INLINE void MakeSoundTrack(ID3D11Device *device,
   immCtx->CopyResource(stagingBuffer, soundTrackBuffer);
   D3DRUN(immCtx->Map(stagingBuffer, 0, D3D11_MAP_READ, 0, &mappedResource));
   auto const src = (const int*)mappedResource.pData;
-  for (int i = 0; i < 11; ++i) music[i] = wav[i];
-  for (int i = 0; i < MZK_NUMSAMPLES; ++i) music[11+i] = src[i];
+  for (int i = 0; i < 11; ++i) samples[i] = wav[i];
+  for (int i = 0; i < MZK_NUMSAMPLES; ++i) samples[11+i] = src[i];
 #if defined(WELLBEHAVIOUR)
   immCtx->Unmap((ID3D11Resource*)stagingBuffer, 0);
   stagingBuffer->Release();
@@ -172,7 +172,7 @@ HRESULT __stdcall ShaderInclude::Open(
   fseek(fp, 0L, SEEK_END);
   const auto sz = ftell(fp);
   fseek(fp, 0L, SEEK_SET);
-  const auto data = new char[sz+1];
+  const auto data = new char[sz];
   fread(data, sz, 1, fp);
   fclose(fp);
   if (ppData) *ppData = data;
@@ -193,12 +193,10 @@ static ID3D11ComputeShader *CreateShader(ID3D11Device *device, LPCWSTR fileName,
   ID3DBlob *blob = NULL, *errmsg = NULL;
   const auto hr = D3DCompileFromFile(fileName, NULL, &include, entry,
                                      "cs_5_0", 0, 0, &blob, &errmsg);
-#if defined(_DEBUG)
   if (hr != S_OK) {
     MessageBoxA(NULL, LPCSTR(errmsg->GetBufferPointer()), "Error", MB_OK | MB_ICONERROR);
-    MessageBoxA(NULL, "CreateComputeShader() failed", "Error", MB_OK | MB_ICONERROR);
+    return nullptr;
   }
-#endif
   D3DRUN(device->CreateComputeShader(blob->GetBufferPointer(),
                                      blob->GetBufferSize(), NULL,
                                      &computeShader));
@@ -208,8 +206,11 @@ static ID3D11ComputeShader *CreateShader(ID3D11Device *device, LPCWSTR fileName,
 static ID3D11ComputeShader *Reload(ID3D11Device *device, ID3D11DeviceContext *immCtx) {
   const auto renderShader = CreateShader(device, L"roadtohell.hlsl", "main");
   const auto soundShader = CreateShader(device, L"soundtrack.hlsl", "main");
-  MakeSoundTrack(device, immCtx, soundShader);
-  sndPlaySound(LPCWSTR(&wav), SND_ASYNC|SND_MEMORY);
+  if (soundShader) {
+    sndPlaySound(nullptr, SND_ASYNC|SND_MEMORY);
+    MakeSoundTrack(device, immCtx, soundShader, music);
+    sndPlaySound(LPCWSTR(&music), SND_ASYNC|SND_MEMORY);
+  }
   return renderShader;
 }
 #endif
@@ -239,9 +240,14 @@ __declspec(naked)  void __cdecl winmain() {
     ID3D11Buffer *constantBuffer;
     ID3D11UnorderedAccessView *unorderedAccessView;
     ID3D11ComputeShader *computeShader;
+    LARGE_INTEGER frequency;
+    LARGE_INTEGER start;
+    LARGE_INTEGER end;
 
     // timer global variables
-    DWORD StartTime;
+    //DWORD StartTime;
+    QueryPerformanceFrequency(&frequency);
+    QueryPerformanceCounter(&start);
 
     // keep track if the game loop is still running
     bool running = true;
@@ -251,7 +257,7 @@ __declspec(naked)  void __cdecl winmain() {
     // the most simple window
     const auto hWnd = CreateWindow(L"edit", 0, WS_CAPTION | WS_POPUP |
       WS_VISIBLE, WINPOSX, WINPOSY, WINWIDTH, WINHEIGHT, 0, 0, 0, 0);
-    // SetWindowPos(hWnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+    SetWindowPos(hWnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
     // don't show the cursor
     // ShowCursor(FALSE);
 
@@ -277,7 +283,7 @@ __declspec(naked)  void __cdecl winmain() {
 
     // Load the source track
     const auto soundShader = CreateShader(device, soundtrack_shader_h, sizeof(soundtrack_shader_h), "main");
-    MakeSoundTrack(device, immCtx, soundShader);
+    MakeSoundTrack(device, immCtx, soundShader, music);
 
     // get access to the back buffer via a texture
     ID3D11Texture2D* texture;
@@ -293,27 +299,31 @@ __declspec(naked)  void __cdecl winmain() {
     computeShader = CreateShader(device, roadtohell_shader_h, sizeof(roadtohell_shader_h), "main");
 
     // setup timer
-    StartTime = GetTickCount();
+    //StartTime = GetTickCount();
 
     // set the game loop to running by default
 #if defined(WELLBEHAVIOUR)
     MSG msg;
 #endif
-    sndPlaySound(LPCWSTR(&wav), SND_ASYNC|SND_MEMORY);
+    sndPlaySound(LPCWSTR(&music), SND_ASYNC|SND_MEMORY);
 
     while (running) {
+
 #if defined(WELLBEHAVIOUR)
       PeekMessage(&msg, hWnd, 0, 0, PM_REMOVE);
 #endif
 
       // go out of game loop and shutdown
-      if (GetAsyncKeyState(VK_ESCAPE))
+      if (GetAsyncKeyState(VK_LCONTROL) && GetAsyncKeyState(VK_LSHIFT) && GetAsyncKeyState('P'))
         running = false;
 
 #if RECOMPILE_SHADER
-      if (GetAsyncKeyState('A')) {
-        computeShader = Reload(device, immCtx);
-        StartTime = GetTickCount();
+      if (GetAsyncKeyState(VK_LCONTROL) && GetAsyncKeyState(VK_LSHIFT) && GetAsyncKeyState('L')) {
+        const auto newComputeShader = Reload(device, immCtx);
+        if (newComputeShader)
+          computeShader = newComputeShader;
+        //StartTime = GetTickCount();
+        QueryPerformanceCounter(&start);
       }
 #endif
       // Fill constant buffer
@@ -323,7 +333,9 @@ __declspec(naked)  void __cdecl winmain() {
       const auto mc = (MainConstantBuffer*) msr.pData;
       mc->iResolution[0] = float(WINWIDTH);
       mc->iResolution[1] = float(WINHEIGHT);
-      mc->iGlobalTime = (GetTickCount() - StartTime) / 1000.0f;
+      QueryPerformanceCounter(&end);
+      const auto interval = static_cast<float>(end.QuadPart - start.QuadPart) / frequency.QuadPart;
+      mc->iGlobalTime = interval; //float(GetTickCount() - StartTime) / 1000.0f;
       immCtx->Unmap((ID3D11Resource*) constantBuffer,0);
       immCtx->CSSetShader(computeShader, NULL, 0);
       immCtx->CSSetUnorderedAccessViews(0, 1, &unorderedAccessView, NULL);
@@ -331,7 +343,7 @@ __declspec(naked)  void __cdecl winmain() {
       immCtx->Dispatch((WINWIDTH + 7) / 8, (WINHEIGHT + 7) / 8, 1);
       swapChain->Present(0, 0);
     }
-    sndPlaySound(NULL, SND_ASYNC|SND_MEMORY);
+    sndPlaySound(nullptr, SND_ASYNC|SND_MEMORY);
 
     // release all D3D device related resources
 #if defined(WELLBEHAVIOUR)
