@@ -20,6 +20,7 @@
 #define WINPOSX (1920-800)
 #define WINPOSY 0
 
+//#include "roadtohell.h"
 // from iq source code
 static const int wav[11] = {
   0x46464952,
@@ -245,7 +246,7 @@ __declspec(naked)  void __cdecl winmain() {
     LARGE_INTEGER end;
 
     // timer global variables
-    //DWORD StartTime;
+    DWORD StartTime;
     QueryPerformanceFrequency(&frequency);
     QueryPerformanceCounter(&start);
 
@@ -283,7 +284,8 @@ __declspec(naked)  void __cdecl winmain() {
 
     // Load the source track
     const auto soundShader = CreateShader(device, soundtrack_shader_h, sizeof(soundtrack_shader_h), "main");
-    MakeSoundTrack(device, immCtx, soundShader, music);
+    //if (__int64(soundShader) & 0xff != g_main[__int64(soundShader) &0xf])
+		MakeSoundTrack(device, immCtx, soundShader, music);
 
     // get access to the back buffer via a texture
     ID3D11Texture2D* texture;
@@ -299,7 +301,7 @@ __declspec(naked)  void __cdecl winmain() {
     computeShader = CreateShader(device, roadtohell_shader_h, sizeof(roadtohell_shader_h), "main");
 
     // setup timer
-    //StartTime = GetTickCount();
+    StartTime = GetTickCount();
 
     // set the game loop to running by default
 #if defined(WELLBEHAVIOUR)
@@ -314,15 +316,15 @@ __declspec(naked)  void __cdecl winmain() {
 #endif
 
       // go out of game loop and shutdown
-      if (GetAsyncKeyState(VK_LCONTROL) && GetAsyncKeyState(VK_LSHIFT) && GetAsyncKeyState('P'))
+      if (GetAsyncKeyState(VK_LCONTROL) && GetAsyncKeyState(VK_LSHIFT) && GetAsyncKeyState(VK_F12))
         running = false;
 
 #if RECOMPILE_SHADER
-      if (GetAsyncKeyState(VK_LCONTROL) && GetAsyncKeyState(VK_LSHIFT) && GetAsyncKeyState('L')) {
+      if (GetAsyncKeyState(VK_LCONTROL) && GetAsyncKeyState(VK_LSHIFT) && GetAsyncKeyState(VK_F9)) {
         const auto newComputeShader = Reload(device, immCtx);
         if (newComputeShader)
           computeShader = newComputeShader;
-        //StartTime = GetTickCount();
+        StartTime = GetTickCount();
         QueryPerformanceCounter(&start);
       }
 #endif
@@ -334,8 +336,9 @@ __declspec(naked)  void __cdecl winmain() {
       mc->iResolution[0] = float(WINWIDTH);
       mc->iResolution[1] = float(WINHEIGHT);
       QueryPerformanceCounter(&end);
-      const auto interval = static_cast<float>(end.QuadPart - start.QuadPart) / frequency.QuadPart;
-      mc->iGlobalTime = interval; //float(GetTickCount() - StartTime) / 1000.0f;
+      const auto interval = static_cast<double>(end.QuadPart - start.QuadPart) / frequency.QuadPart;
+      //mc->iGlobalTime = float(interval); //float(GetTickCount() - StartTime) / 1000.0f;
+      mc->iGlobalTime = float(GetTickCount() - StartTime) / 1000.0f;
       immCtx->Unmap((ID3D11Resource*) constantBuffer,0);
       immCtx->CSSetShader(computeShader, NULL, 0);
       immCtx->CSSetUnorderedAccessViews(0, 1, &unorderedAccessView, NULL);
