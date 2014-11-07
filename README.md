@@ -26,9 +26,9 @@ Visual Studio solution you can use to debug.
 
 Two outputs are supported:
 
-* \'normal\' where you can also hot-reload the shaders
+* normal where you can also hot-reload the shaders
 
-* \'minified\' where everything is packed with crinkler and useless code removed
+* minified where everything is packed with crinkler and useless code removed
 
 Everything was rushed so expect bugs everywhere.
 
