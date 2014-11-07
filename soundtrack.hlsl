@@ -4,7 +4,7 @@ static const float TAU=2.f*PI;
 
 RWStructuredBuffer<int> g_soundTrack : register(u0);
 
-#if 0
+#if 1
 float Envelope(float time, float decay) {	
   return exp2(-time * (5.0 / decay));
 }
@@ -158,8 +158,8 @@ float PlayMidi( float time ) {
 }
 float2 music(float t) { float x = 1.0*PlayMidi(t); return float2(x,x); }
 #else
-float2 music(float t) { return float2(0.f,0.f); }
-//float2 music(float t) { return float2(sin(fmod(TAU*440.f*t,TAU)),sin(fmod(TAU*440.f*t,TAU))); }
+//float2 music(float t) { return float2(0.f,0.f); }
+float2 music(float t) { return float2(sin(fmod(TAU*440.f*t,TAU)),sin(fmod(TAU*440.f*t,TAU))); }
 #endif
 
 [numthreads(1024, 1, 1)]

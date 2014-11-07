@@ -32,3 +32,6 @@ Two outputs are supported:
 
 Everything was rushed so expect bugs everywhere.
 
+shader minifier does not seem really stable with HLSL. In particular, the doom2
+soundtrack is buggy when minified.
+

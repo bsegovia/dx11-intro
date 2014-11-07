@@ -16,8 +16,13 @@
 #include "sys.hpp"
 #include "sound.hpp"
 #include "roadtohell.shader.h"
-#include "soundtrack.shader.h"
 
+// Bug with shader minifier unfortunately...
+#if 0
+#include "soundtrack.shader.h"
+#else
+#include "non_minified_sound_shader.h"
+#endif
 #define WINWIDTH 800
 #define WINHEIGHT 600
 #define WINPOSX (1920-800)
@@ -287,8 +292,7 @@ __declspec(naked)  void __cdecl winmain() {
 
     // Load the source track
     const auto soundShader = CreateShader(device, soundtrack_shader_h, sizeof(soundtrack_shader_h), "main");
-    //if (__int64(soundShader) & 0xff != g_main[__int64(soundShader) &0xf])
-		MakeSoundTrack(device, immCtx, soundShader, music);
+    MakeSoundTrack(device, immCtx, soundShader, music);
 
     // get access to the back buffer via a texture
     ID3D11Texture2D* texture;
