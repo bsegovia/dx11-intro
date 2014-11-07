@@ -22,11 +22,11 @@ them on host and run everything.
 
 Since I was lazy, compilation is using cygwin (calling msvc from a Makefile). It
 was just easier to generate the dependency rules with that. There is however a
-Visual Studio isolution you can use to debug.
+Visual Studio solution you can use to debug.
 
 Two outputs are supported:
-* 'normal' where you can also hot-reload the shaders
-* 'minified' where everything is packed with crinkler and useless code removed
+* \'normal\' where you can also hot-reload the shaders
+* \'minified\' where everything is packed with crinkler and useless code removed
 
 Everything was rushed so expect bugs everywhere.
 
