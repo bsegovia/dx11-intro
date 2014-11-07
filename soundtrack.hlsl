@@ -1,3 +1,6 @@
+// doom soundtrack converted from midi to shader by P_Malin
+// see: https://t.co/EocIajlKnS
+
 #include "sound.hpp"
 static const float PI=3.14159265358979323846f;
 static const float TAU=2.f*PI;

@@ -1,3 +1,5 @@
+// road to hell by rez
+// see: https://www.shadertoy.com/view/Mds3Rn
 static const float PI=3.14159265358979323846f;
 
 #define RESOLUTION _r
