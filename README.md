@@ -35,3 +35,6 @@ Everything was rushed so expect bugs everywhere.
 shader minifier does not seem really stable with HLSL. In particular, the doom2
 soundtrack is buggy when minified.
 
+To quit do CRTL-F1 and to reload shaders (from file) do CTRL-F9
+
+
