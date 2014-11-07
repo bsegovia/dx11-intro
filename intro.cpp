@@ -1,3 +1,6 @@
+/// Demo framework for dx11
+/// Based on http//code.google.com/p/graphicsdemoskeleton/ (for gfx)
+/// and http://www.iquilezles.org/www/material/isystem1k4k/isystem1k4k.htm (for sound)
 #define WIN32_LEAN_AND_MEAN
 #define WIN32_EXTRA_LEAN
 
